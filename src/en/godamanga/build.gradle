@@ -1,0 +1,13 @@
+ext {
+    extName = 'GoDamanga'
+    extClass = '.godamanga'
+    extVersionCode = 1
+    isNsfw = true
+}
+
+/*Importing jsoup library for web scraping
+dependecies {
+     implementation("org.jsoup:jsoup:1.17.2")
+}*/
+
+apply from: "$rootDir/common.gradle"
