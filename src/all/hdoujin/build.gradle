@@ -1,0 +1,9 @@
+ext {
+    extName = 'HDoujin'
+    extClass = '.HDoujinFactory'
+    extVersionCode = 1
+    baseUrl = 'https://hdoujin.net'
+    isNsfw = true
+}
+
+apply from: "$rootDir/common.gradle"
