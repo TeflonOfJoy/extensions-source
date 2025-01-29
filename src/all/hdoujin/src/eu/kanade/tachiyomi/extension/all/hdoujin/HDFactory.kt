@@ -1,9 +1,10 @@
 package eu.kanade.tachiyomi.extension.all.hdoujin
 
+import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
 
 class HDFactory : SourceFactory {
-    override fun createSources() = listOf(
+    override fun createSources(): List<Source> = listOf(
         HDoujin("all", ""),
         HDoujin("en", "2"),
         HDoujin("jp", "4"),

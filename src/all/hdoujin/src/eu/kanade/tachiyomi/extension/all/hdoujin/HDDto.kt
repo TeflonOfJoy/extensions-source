@@ -4,31 +4,31 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 class HDDto(
-        var id: Int,
-        val images: Images,
-        val tags: List<Tag>,
-        val title: Title,
-        val upload_date: Long,
-        val num_favorites: Long,
-        )
+    var id: Int,
+    val images: Images,
+    val tags: List<Tag>,
+    val title: Title,
+    val upload_date: Long,
+    val num_favorites: Long,
+)
 
 @Serializable
 class Title(
-        var english: String? = null,
-        val japanese: String? = null,
-        )
+    var english: String? = null,
+    val japanese: String? = null,
+)
 
 @Serializable
 class Images(
-        val pages: List<Image>,
-        )
+    val pages: List<Image>,
+)
 
 @Serializable
 class Image(
-        val t: String,
-        )
+    val t: String,
+)
 
 @Serializable
 class Tag(
-        val name: String,
-        )
+    val name: String,
+)
