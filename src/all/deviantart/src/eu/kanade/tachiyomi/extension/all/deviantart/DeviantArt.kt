@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.extension.all.deviantart
 
-import android.app.Application
 import android.content.SharedPreferences
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
@@ -13,6 +12,8 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.util.asJsoup
+import keiyoushi.utils.getPreferencesLazy
+import keiyoushi.utils.tryParse
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
@@ -20,9 +21,6 @@ import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.parser.Parser
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
-import java.text.ParseException
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -32,9 +30,7 @@ class DeviantArt : HttpSource(), ConfigurableSource {
     override val lang = "all"
     override val supportsLatest = false
 
-    private val preferences: SharedPreferences by lazy {
-        Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
-    }
+    private val preferences: SharedPreferences by getPreferencesLazy()
 
     override fun headersBuilder() = Headers.Builder().apply {
         add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0")
@@ -45,14 +41,6 @@ class DeviantArt : HttpSource(), ConfigurableSource {
 
     private val dateFormat by lazy {
         SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH)
-    }
-
-    private fun parseDate(dateStr: String?): Long {
-        return try {
-            dateFormat.parse(dateStr ?: "")!!.time
-        } catch (_: ParseException) {
-            0L
-        }
     }
 
     override fun popularMangaRequest(page: Int): Request {
@@ -98,9 +86,9 @@ class DeviantArt : HttpSource(), ConfigurableSource {
         return SManga.create().apply {
             setUrlWithoutDomain(response.request.url.toString())
             author = document.title().substringBefore(" ")
-            title = when (artistInTitle) {
-                true -> "$author - $galleryName"
-                false -> galleryName
+            title = when {
+                artistInTitle -> "$author - $galleryName"
+                else -> galleryName
             }
             description = gallery?.selectFirst(".legacy-journal")?.wholeText()
             thumbnail_url = gallery?.selectFirst("img[property=contentUrl]")?.absUrl("src")
@@ -138,47 +126,45 @@ class DeviantArt : HttpSource(), ConfigurableSource {
             nextUrl = newDocument.selectFirst("[rel=next]")?.absUrl("href")
         }
 
-        return chapterList.toList().also(::indexChapterList)
+        return chapterList.also(::orderChapterList).toList()
     }
 
     private fun parseToChapterList(document: Document): List<SChapter> {
-        val items = document.select("item")
-        return items.map {
+        return document.select("item").map {
             SChapter.create().apply {
                 setUrlWithoutDomain(it.selectFirst("link")!!.text())
                 name = it.selectFirst("title")!!.text()
-                date_upload = parseDate(it.selectFirst("pubDate")?.text())
+                date_upload = dateFormat.tryParse(it.selectFirst("pubDate")?.text())
                 scanlator = it.selectFirst("media|credit")?.text()
             }
         }
     }
 
-    private fun indexChapterList(chapterList: List<SChapter>) {
-        // DeviantArt allows users to arrange galleries arbitrarily so we will
-        // primitively index the list by checking the first and last dates
-        if (chapterList.first().date_upload > chapterList.last().date_upload) {
-            chapterList.forEachIndexed { i, chapter ->
-                chapter.chapter_number = chapterList.size - i.toFloat()
-            }
-        } else {
-            chapterList.forEachIndexed { i, chapter ->
-                chapter.chapter_number = i.toFloat() + 1
-            }
+    private fun orderChapterList(chapterList: MutableList<SChapter>) {
+        // In Mihon's updates tab, chapters are ordered by source instead
+        // of chapter number, so to avoid updates being shown in reverse,
+        // disregard source order and order chronologically instead
+        if (chapterList.first().date_upload < chapterList.last().date_upload) {
+            chapterList.reverse()
+        }
+        chapterList.forEachIndexed { i, chapter ->
+            chapter.chapter_number = chapterList.size - i.toFloat()
         }
     }
 
     override fun pageListParse(response: Response): List<Page> {
         val document = response.asJsoup()
-        val firstImageUrl = document.selectFirst("img[fetchpriority=high]")?.absUrl("src")
-        return when (val buttons = document.selectFirst("[draggable=false]")?.children()) {
-            null -> listOf(Page(0, imageUrl = firstImageUrl))
-            else -> buttons.mapIndexed { i, button ->
+        val buttons = document.selectFirst("[draggable=false]")?.children()
+        return if (buttons == null) {
+            val imageUrl = document.selectFirst("img[fetchpriority=high]")?.absUrl("src")
+            listOf(Page(0, imageUrl = imageUrl))
+        } else {
+            buttons.mapIndexed { i, button ->
                 // Remove everything past "/v1/" to get original instead of thumbnail
-                val imageUrl = button.selectFirst("img")?.absUrl("src")?.substringBefore("/v1/")
+                // But need to preserve the query parameter where the token is
+                val imageUrl = button.selectFirst("img")?.absUrl("src")
+                    ?.replaceFirst(Regex("""/v1(/.*)?(?=\?)"""), "")
                 Page(i, imageUrl = imageUrl)
-            }.also {
-                // First image needs token to get original, which is included in firstImageUrl
-                it[0].imageUrl = firstImageUrl
             }
         }
     }

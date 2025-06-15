@@ -3,7 +3,8 @@ ext {
     extClass = '.Mangakakalot'
     themePkg = 'mangabox'
     baseUrl = 'https://www.mangakakalot.gg'
-    overrideVersionCode = 4
+    overrideVersionCode = 6
+    isNsfw = true
 }
 
 apply from: "$rootDir/common.gradle"

@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.extension.ru.desu
 
-import android.app.Application
 import android.content.SharedPreferences
 import android.widget.Toast
 import androidx.preference.EditTextPreference
@@ -16,6 +15,7 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
+import keiyoushi.utils.getPreferences
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
@@ -32,8 +32,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import rx.Observable
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 
 class Desu : ConfigurableSource, HttpSource() {
@@ -41,8 +39,7 @@ class Desu : ConfigurableSource, HttpSource() {
 
     override val id: Long = 6684416167758830305
 
-    private val preferences: SharedPreferences =
-        Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
+    private val preferences: SharedPreferences = getPreferences()
 
     init {
         preferences.getString(DEFAULT_DOMAIN_PREF, null).let { prefDefaultDomain ->
@@ -142,22 +139,25 @@ class Desu : ConfigurableSource, HttpSource() {
     }
 
     override fun popularMangaRequest(page: Int) =
-        GET("$baseUrl$API_URL/?limit=50&order=popular&page=$page")
+        GET("$baseUrl$API_URL/?limit=50&order=popular&page=$page", headers)
 
     override fun popularMangaParse(response: Response) = searchMangaParse(response)
 
     override fun latestUpdatesRequest(page: Int) =
-        GET("$baseUrl$API_URL/?limit=50&order=updated&page=$page")
+        GET("$baseUrl$API_URL/?limit=50&order=updated&page=$page", headers)
 
     override fun latestUpdatesParse(response: Response): MangasPage = searchMangaParse(response)
 
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
-        var url = "$baseUrl$API_URL/?limit=20&page=$page"
+        val url = "$baseUrl$API_URL/".toHttpUrl().newBuilder()
+            .addQueryParameter("limit", "20")
+            .addQueryParameter("page", page.toString())
+
         val types = mutableListOf<Type>()
         val genres = mutableListOf<Genre>()
         (if (filters.isEmpty()) getFilterList() else filters).forEach { filter ->
             when (filter) {
-                is OrderBy -> url += "&order=" + arrayOf("popular", "updated", "name")[filter.state]
+                is OrderBy -> url.addQueryParameter("order", arrayOf("popular", "updated", "name")[filter.state])
                 is TypeList -> filter.state.forEach { type -> if (type.state) types.add(type) }
                 is GenreList -> filter.state.forEach { genre -> if (genre.state) genres.add(genre) }
                 else -> {}
@@ -165,15 +165,15 @@ class Desu : ConfigurableSource, HttpSource() {
         }
 
         if (types.isNotEmpty()) {
-            url += "&kinds=" + types.joinToString(",") { it.id }
+            url.addQueryParameter("kinds", types.joinToString(",") { it.id })
         }
         if (genres.isNotEmpty()) {
-            url += "&genres=" + genres.joinToString(",") { it.id }
+            url.addQueryParameter("genres", genres.joinToString(",") { it.id })
         }
         if (query.isNotEmpty()) {
-            url += "&search=$query"
+            url.addQueryParameter("search", query)
         }
-        return GET(url)
+        return GET(url.build(), headers)
     }
 
     override fun searchMangaParse(response: Response): MangasPage {

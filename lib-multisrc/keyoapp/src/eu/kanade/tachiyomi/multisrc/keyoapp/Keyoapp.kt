@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.multisrc.keyoapp
 
-import android.app.Application
 import android.content.SharedPreferences
 import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreferenceCompat
@@ -15,6 +14,7 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.ParsedHttpSource
 import eu.kanade.tachiyomi.util.asJsoup
+import keiyoushi.utils.getPreferencesLazy
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -23,8 +23,6 @@ import okhttp3.Request
 import okhttp3.Response
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 import java.text.ParseException
 import java.text.SimpleDateFormat
@@ -37,9 +35,7 @@ abstract class Keyoapp(
     final override val lang: String,
 ) : ParsedHttpSource(), ConfigurableSource {
 
-    protected val preferences: SharedPreferences by lazy {
-        Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
-    }
+    protected val preferences: SharedPreferences by getPreferencesLazy()
 
     override val supportsLatest = true
 
@@ -63,7 +59,16 @@ abstract class Keyoapp(
 
     override fun popularMangaRequest(page: Int): Request = GET(baseUrl, headers)
 
-    override fun popularMangaSelector(): String = "div.flex-col div.grid > div.group.border"
+    open val popularMangaTitleSelector = listOf(
+        "Popular",
+        "Popularie",
+        "Trending",
+    )
+
+    override fun popularMangaSelector(): String = selector(
+        "div:contains(%s) + div .group.overflow-hidden.grid",
+        popularMangaTitleSelector,
+    )
 
     override fun popularMangaFromElement(element: Element): SManga = SManga.create().apply {
         thumbnail_url = element.getImageUrl("*[style*=background-image]")
@@ -246,7 +251,7 @@ abstract class Keyoapp(
 
     override fun chapterListSelector(): String {
         if (!preferences.showPaidChapters) {
-            return "#chapters > a:not(:has(.text-sm span:matches(Upcoming))):not(:has(img[src*=Coin.svg]))"
+            return "#chapters > a:not(:has(.text-sm span:matches(Upcoming))):not(:has(img[alt~=Coin]))"
         }
         return "#chapters > a:not(:has(.text-sm span:matches(Upcoming)))"
     }
@@ -358,6 +363,10 @@ abstract class Keyoapp(
             "year" in this -> now.add(Calendar.YEAR, -relativeDate) // parse: "2 years ago"
         }
         return now.timeInMillis
+    }
+
+    private fun selector(selector: String, contains: List<String>): String {
+        return contains.joinToString { selector.replace("%s", it) }
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {

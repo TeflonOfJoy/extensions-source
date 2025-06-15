@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.extension.zh.manhuagui
 
-import android.app.Application
 import android.content.SharedPreferences
 import eu.kanade.tachiyomi.lib.lzstring.LZString
 import eu.kanade.tachiyomi.lib.unpacker.Unpacker
@@ -17,6 +16,7 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.ParsedHttpSource
 import eu.kanade.tachiyomi.util.asJsoup
+import keiyoushi.utils.getPreferencesLazy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
@@ -37,8 +37,6 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import rx.Observable
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -49,9 +47,7 @@ class Manhuagui(
     override val lang: String = "zh",
 ) : ConfigurableSource, ParsedHttpSource() {
 
-    private val preferences: SharedPreferences by lazy {
-        Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
-    }
+    private val preferences: SharedPreferences by getPreferencesLazy()
 
     private val baseHost = if (preferences.getBoolean(USE_MIRROR_URL_PREF, false)) {
         "mhgui.com"
@@ -75,14 +71,14 @@ class Manhuagui(
     // Add rate limit to fix manga thumbnail load failure
     override val client: OkHttpClient =
         if (getShowR18()) {
-            network.client.newBuilder()
+            network.cloudflareClient.newBuilder()
                 .rateLimitHost(baseHttpUrl, preferences.getString(MAINSITE_RATELIMIT_PREF, MAINSITE_RATELIMIT_DEFAULT_VALUE)!!.toInt(), 10)
                 .rateLimitHost(imageServer[0].toHttpUrl(), preferences.getString(IMAGE_CDN_RATELIMIT_PREF, IMAGE_CDN_RATELIMIT_DEFAULT_VALUE)!!.toInt())
                 .rateLimitHost(imageServer[1].toHttpUrl(), preferences.getString(IMAGE_CDN_RATELIMIT_PREF, IMAGE_CDN_RATELIMIT_DEFAULT_VALUE)!!.toInt())
                 .addNetworkInterceptor(AddCookieHeaderInterceptor(baseHttpUrl.host))
                 .build()
         } else {
-            network.client.newBuilder()
+            network.cloudflareClient.newBuilder()
                 .rateLimitHost(baseHttpUrl, preferences.getString(MAINSITE_RATELIMIT_PREF, MAINSITE_RATELIMIT_DEFAULT_VALUE)!!.toInt(), 10)
                 .rateLimitHost(imageServer[0].toHttpUrl(), preferences.getString(IMAGE_CDN_RATELIMIT_PREF, IMAGE_CDN_RATELIMIT_DEFAULT_VALUE)!!.toInt())
                 .rateLimitHost(imageServer[1].toHttpUrl(), preferences.getString(IMAGE_CDN_RATELIMIT_PREF, IMAGE_CDN_RATELIMIT_DEFAULT_VALUE)!!.toInt())

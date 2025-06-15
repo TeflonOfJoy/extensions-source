@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.extension.pt.taiyo
 
-import android.app.Application
 import android.content.SharedPreferences
 import eu.kanade.tachiyomi.extension.pt.taiyo.dto.AdditionalInfoDto
 import eu.kanade.tachiyomi.extension.pt.taiyo.dto.ChapterListDto
@@ -17,6 +16,7 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.ParsedHttpSource
 import eu.kanade.tachiyomi.util.asJsoup
+import keiyoushi.utils.getPreferences
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -32,15 +32,13 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import okhttp3.internal.http.HTTP_FORBIDDEN
-import okhttp3.internal.http.HTTP_UNAUTHORIZED
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
 import rx.Observable
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
+import java.net.HttpURLConnection.HTTP_FORBIDDEN
+import java.net.HttpURLConnection.HTTP_UNAUTHORIZED
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -55,8 +53,7 @@ class Taiyo : ParsedHttpSource() {
     // The source doesn't show the title on the home page
     override val supportsLatest = false
 
-    private val preferences: SharedPreferences =
-        Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
+    private val preferences: SharedPreferences = getPreferences()
 
     private var bearerToken: String = preferences.getString(BEARER_TOKEN_PREF, "").toString()
 
@@ -320,7 +317,7 @@ class Taiyo : ParsedHttpSource() {
         val script = getScriptContainingToken(scripts)
             ?: throw Exception("Não foi possivel localizar o token")
 
-        return TOKEN_REGEX.find(script)?.groups?.get(1)?.value
+        return TOKEN_REGEX.find(script)?.groups?.get(2)?.value
             ?: throw Exception("Não foi possivel extrair o token")
     }
 

@@ -3,7 +3,8 @@ ext {
     extClass = '.Manganato'
     themePkg = 'mangabox'
     baseUrl = 'https://www.natomanga.com'
-    overrideVersionCode = 3
+    overrideVersionCode = 5
+    isNsfw = true
 }
 
 apply from: "$rootDir/common.gradle"

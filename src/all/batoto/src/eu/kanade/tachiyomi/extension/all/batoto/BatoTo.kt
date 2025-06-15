@@ -20,6 +20,7 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.ParsedHttpSource
 import eu.kanade.tachiyomi.util.asJsoup
+import keiyoushi.utils.getPreferencesLazy
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -48,10 +49,7 @@ open class BatoTo(
     private val siteLang: String,
 ) : ConfigurableSource, ParsedHttpSource() {
 
-    private val preferences: SharedPreferences by lazy {
-        Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
-            .migrateMirrorPref()
-    }
+    private val preferences by getPreferencesLazy { migrateMirrorPref() }
 
     override val name: String = "Bato.to"
     override val baseUrl: String get() = mirror
@@ -125,14 +123,12 @@ open class BatoTo(
         return preferences.getBoolean("${REMOVE_TITLE_VERSION_PREF}_$lang", false)
     }
 
-    private fun SharedPreferences.migrateMirrorPref(): SharedPreferences {
+    private fun SharedPreferences.migrateMirrorPref() {
         val selectedMirror = getString("${MIRROR_PREF_KEY}_$lang", MIRROR_PREF_DEFAULT_VALUE)!!
 
         if (selectedMirror in DEPRECATED_MIRRORS) {
             edit().putString("${MIRROR_PREF_KEY}_$lang", MIRROR_PREF_DEFAULT_VALUE).commit()
         }
-
-        return this
     }
 
     override val supportsLatest = true
@@ -283,7 +279,7 @@ open class BatoTo(
         manga.title = infoElement.select("h3").text().removeEntities()
         manga.thumbnail_url = document.select("div.attr-cover img")
             .attr("abs:src")
-        manga.url = infoElement.select("h3 a").attr("abs:href")
+        manga.setUrlWithoutDomain(infoElement.select("h3 a").attr("abs:href"))
         return MangasPage(listOf(manga), false)
     }
 
@@ -409,7 +405,7 @@ open class BatoTo(
         return Jsoup.parse(response.body.string(), response.request.url.toString(), Parser.xmlParser())
             .select("channel > item").map { item ->
                 SChapter.create().apply {
-                    url = item.selectFirst("guid")!!.text()
+                    setUrlWithoutDomain(item.selectFirst("guid")!!.text())
                     name = item.selectFirst("title")!!.text()
                     date_upload = parseAltChapterDate(item.selectFirst("pubDate")!!.text())
                 }

@@ -26,6 +26,7 @@ abstract class Iken(
     override val name: String,
     override val lang: String,
     override val baseUrl: String,
+    val apiUrl: String = baseUrl,
 ) : HttpSource(), ConfigurableSource {
 
     override val supportsLatest = true
@@ -39,7 +40,7 @@ abstract class Iken(
 
     private var genres = emptyList<Pair<String, String>>()
     protected val titleCache by lazy {
-        val response = client.newCall(GET("$baseUrl/api/query?perPage=9999", headers)).execute()
+        val response = client.newCall(GET("$apiUrl/api/query?perPage=9999", headers)).execute()
         val data = response.parseAs<SearchResponse>()
 
         data.posts
@@ -66,11 +67,23 @@ abstract class Iken(
         return MangasPage(entries, false)
     }
 
-    override fun latestUpdatesRequest(page: Int) = searchMangaRequest(page, "", getFilterList())
+    override fun latestUpdatesRequest(page: Int): Request {
+        val url = "$apiUrl/api/posts".toHttpUrl().newBuilder().apply {
+            addQueryParameter("page", page.toString())
+            addQueryParameter("perPage", perPage.toString())
+            if (apiUrl.startsWith("https://api.", true)) {
+                addQueryParameter("tag", "latestUpdate")
+                addQueryParameter("isNovel", "false")
+            }
+        }.build()
+
+        return GET(url, headers)
+    }
+
     override fun latestUpdatesParse(response: Response) = searchMangaParse(response)
 
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
-        val url = "$baseUrl/api/query".toHttpUrl().newBuilder().apply {
+        val url = "$apiUrl/api/query".toHttpUrl().newBuilder().apply {
             addQueryParameter("page", page.toString())
             addQueryParameter("perPage", perPage.toString())
             addQueryParameter("searchTerm", query.trim())
@@ -126,7 +139,7 @@ abstract class Iken(
         val userId = userIdRegex.find(response.body.string())?.groupValues?.get(1) ?: ""
 
         val id = response.request.url.fragment!!
-        val chapterUrl = "$baseUrl/api/chapters?postId=$id&skip=0&take=1000&order=desc&userid=$userId"
+        val chapterUrl = "$apiUrl/api/chapters?postId=$id&skip=0&take=900&order=desc&userid=$userId"
         val chapterResponse = client.newCall(GET(chapterUrl, headers)).execute()
 
         val data = chapterResponse.parseAs<Post<ChapterListResponse>>()
